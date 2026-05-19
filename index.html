@@ -38,15 +38,55 @@
 </head>
 <body>
 
-  <!-- Modal สำหรับลบ -->
+  <!-- Modal ลบ -->
   <div id="deleteModal" class="fixed inset-0 z-[100] flex items-center justify-center hidden modal-overlay">
     <div class="bg-white w-[90%] max-w-sm p-8 rounded-3xl shadow-2xl text-center">
       <div class="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4"><i data-lucide="alert-triangle"></i></div>
-      <h3 class="text-xl font-bold" data-th="ยืนยันการลบ?" data-en="Confirm Deletion?">ยืนยันการลบ?</h3>
+      <h3 class="text-xl font-bold">ยืนยันการลบ?</h3>
       <div class="flex gap-4 mt-8">
-        <button onclick="closeModal()" class="flex-1 text-slate-500 font-bold" data-th="ยกเลิก" data-en="Cancel">ยกเลิก</button>
-        <button id="confirmDeleteBtn" class="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold" data-th="ลบออก" data-en="Delete">ลบออก</button>
+        <button onclick="closeModal()" class="flex-1 text-slate-500 font-bold">ยกเลิก</button>
+        <button id="confirmDeleteBtn" class="flex-1 py-3 bg-red-500 text-white rounded-xl font-bold">ลบออก</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal ตั้งค่าอัตโนมัติ -->
+  <div id="settingsModal" class="fixed inset-0 z-[100] flex items-center justify-center hidden modal-overlay">
+    <div class="bg-white w-[90%] max-w-md p-8 rounded-3xl shadow-2xl">
+      <div class="flex justify-between items-center mb-6">
+        <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2"><i data-lucide="settings" class="w-5 h-5"></i> ตั้งค่าระบบอัตโนมัติ</h3>
+        <button onclick="closeSettings()"><i data-lucide="x" class="text-slate-400"></i></button>
+      </div>
+      <div class="space-y-4">
+        <div>
+          <label class="text-[11px] font-bold text-slate-500 uppercase">วันที่เริ่มแจ้งเตือน</label>
+          <input type="date" id="setStartDate" class="input-pro mt-1">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-[11px] font-bold text-slate-500 uppercase">เวลาแจ้งเรียน</label>
+            <select id="setClassHour" class="input-pro mt-1">
+               <option value="6">06:00</option><option value="7">07:00</option>
+               <option value="8">08:00</option><option value="9">09:00</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[11px] font-bold text-slate-500 uppercase">เวลาแจ้งสอบ</label>
+            <select id="setExamHour" class="input-pro mt-1">
+               <option value="6">06:00</option><option value="7">07:00</option>
+               <option value="8">08:00</option><option value="9">09:00</option>
+            </select>
+          </div>
+        </div>
+        <div>
+           <label class="text-[11px] font-bold text-slate-500 uppercase">ภาคเรียนที่ให้แจ้งเตือน</label>
+           <input type="text" id="setNotifySemester" class="input-pro mt-1 bg-slate-50" readonly>
+           <p class="text-[10px] text-rose-500 mt-1">* ระบบจะยึดตามภาคเรียนที่คุณเลือกอยู่ปัจจุบัน</p>
+        </div>
+      </div>
+      <button onclick="saveSettingsBtn()" id="saveSetBtn" class="w-full py-3 mt-6 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-2">
+        <i data-lucide="save" class="w-4 h-4"></i> บันทึกการตั้งค่า
+      </button>
     </div>
   </div>
 
@@ -57,7 +97,10 @@
           <div class="w-8 h-8 bg-rose-500 rounded-lg flex items-center justify-center text-white"><i data-lucide="book-open" class="w-5 h-5"></i></div>
           <h1 class="text-lg font-bold text-slate-800 uppercase">RUniSmart</h1>
         </div>
-        <button onclick="toggleLang()" id="langBtn" class="text-xs font-bold bg-slate-100 px-3 py-1 rounded-md text-slate-600">EN</button>
+        <div class="flex gap-2">
+          <button onclick="openSettings()" class="p-2 bg-slate-100 rounded-lg text-slate-600 hover:bg-slate-200"><i data-lucide="settings" class="w-4 h-4"></i></button>
+          <button onclick="toggleLang()" id="langBtn" class="text-xs font-bold bg-slate-100 px-3 py-1 rounded-md text-slate-600">EN</button>
+        </div>
       </div>
 
       <div class="mb-6">
@@ -133,7 +176,6 @@
             <input type="time" name="examStartTime" id="examStartTime" class="input-pro">
             <input type="time" name="examEndTime" id="examEndTime" class="input-pro">
           </div>
-          <!-- 💡 เพิ่มช่องสถานที่สอบใหม่ตรงนี้ค่ะ -->
           <input type="text" name="examRoom" id="examRoom" placeholder="สถานที่สอบ/ห้องสอบ" class="input-pro mt-2">
         </div>
         
@@ -213,7 +255,6 @@
   </div>
 
   <script>
-    // 🔴 API URL ของพี่พงศ์ภัค
     const API_URL = "https://script.google.com/macros/s/AKfycbxOVR5w72VZSIx280WUbzF9dyxlAw-zJprAVqzE54sJFQWjLzM-41W3JqfHNDqkQLOrqQ/exec";
 
     lucide.createIcons();
@@ -271,7 +312,6 @@
       drawVisual(data);
     }
 
-    // 🎓 วาดตารางเรียน
     function drawClassTable(data) {
       const body = document.getElementById('tableBody');
       const head = document.getElementById('tableHead');
@@ -298,7 +338,6 @@
       lucide.createIcons();
     }
 
-    // 📝 วาดตารางสอบ
     function drawExamTable(data) {
       const body = document.getElementById('examTableBody');
       const head = document.getElementById('examTableHead');
@@ -314,7 +353,7 @@
 
       body.innerHTML = examData.map(item => {
         const r = item.r; const i = item.originalIdx;
-        const examRoom = r[9] || r[4] || '-'; // ดึงค่าห้องสอบคอลัมน์ใหม่มาใช้
+        const examRoom = r[9] || r[4] || '-'; 
         
         return `
         <tr class="hover:bg-slate-50 transition-all">
@@ -332,7 +371,6 @@
       lucide.createIcons();
     }
 
-    // วาดบล็อกสีๆ ตามเดิม
     function drawVisual(data) {
       const mapTH = {'วันจันทร์': 'Mon', 'วันอังคาร': 'Tue', 'วันพุธ': 'Wed', 'วันพฤหัสบดี': 'Thu', 'วันศุกร์': 'Fri', 'วันเสาร์': 'Sat', 'วันอาทิตย์': 'Sun'};
       ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(id => document.getElementById(id).innerHTML = '');
@@ -364,8 +402,6 @@
       const formData = Object.fromEntries(new FormData(this).entries());
       const daysCheckboxes = document.querySelectorAll('input[name="days"]:checked');
       formData.days = Array.from(daysCheckboxes).map(cb => cb.value);
-
-      // สำคัญ: ดึงค่า checkbox การแจ้งเตือนมาให้ชัดเจน
       formData.notifyLine = document.getElementById('notifyLine').checked;
 
       try {
@@ -399,8 +435,6 @@
       const et = r[6] ? r[6].split('-') : []; document.getElementById('examStartTime').value = et[0] || ''; document.getElementById('examEndTime').value = et[1] || '';
       document.getElementById('teacher').value = r[7] || '';
       if(r[8]) document.getElementById('colorTheme').value = r[8];
-      
-      // ดึงค่าห้องสอบมาใส่ในฟอร์มแก้ไข
       document.getElementById('examRoom').value = r[9] || '';
       
       if(window.innerWidth < 1024) window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -454,6 +488,53 @@
         btn.innerHTML = oldHtml; btn.disabled = false;
         alert("เกิดข้อผิดพลาดในการบันทึกภาพค่ะ");
       }
+    }
+
+    async function openSettings() {
+      document.getElementById('setNotifySemester').value = getSemesterStr();
+      document.getElementById('settingsModal').classList.remove('hidden');
+      
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'getSettings' })
+        });
+        const result = await response.json();
+        if(result.status === 'success' && result.data) {
+           const props = result.data;
+           if(props.START_DATE) document.getElementById('setStartDate').value = props.START_DATE;
+           if(props.CLASS_HOUR) document.getElementById('setClassHour').value = props.CLASS_HOUR;
+           if(props.EXAM_HOUR) document.getElementById('setExamHour').value = props.EXAM_HOUR;
+        }
+      } catch (e) { console.error("Error loading settings"); }
+    }
+    
+    function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
+    
+    async function saveSettingsBtn() {
+      const btn = document.getElementById('saveSetBtn'); btn.innerText = "กำลังบันทึก..."; btn.disabled = true;
+      const config = {
+        startDate: document.getElementById('setStartDate').value,
+        classHour: document.getElementById('setClassHour').value,
+        examHour: document.getElementById('setExamHour').value,
+        notifySemester: document.getElementById('setNotifySemester').value
+      };
+      
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'saveSettings', data: config })
+        });
+        const result = await response.json();
+        if(result.status === 'success') {
+          alert("บันทึกการตั้งค่าระบบแจ้งเตือนอัตโนมัติสำเร็จ!");
+          closeSettings();
+        }
+      } catch (e) { alert("เกิดข้อผิดพลาดในการบันทึก"); }
+      
+      btn.innerHTML = `<i data-lucide="save" class="w-4 h-4"></i> บันทึกการตั้งค่า`; btn.disabled = false; lucide.createIcons();
     }
   </script>
 </body>
