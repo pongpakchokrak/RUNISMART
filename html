@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>RUniSmart - Schedule Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --primary-red: #7f0101; }
+    body { font-family: 'Bai Jamjuree', sans-serif; background-color: #fafafa; color: #1e293b; overflow-x: hidden; }
+    .app-container { display: flex; flex-direction: column; min-height: 100vh; }
+    .sidebar { background: #ffffff; border-bottom: 1px solid #f1f5f9; width: 100%; padding: 20px; z-index: 10; box-shadow: 2px 0 10px rgba(0,0,0,0.02); }
+    .main-content { padding: 15px; flex-grow: 1; }
+    @media (min-width: 1024px) { 
+      .app-container { flex-direction: row; }
+      .sidebar { width: 420px; height: 100vh; position: fixed; border-right: 1px solid #f1f5f9; border-bottom: none; overflow-y: auto; } 
+      .main-content { margin-left: 420px; padding: 40px; } 
+    }
+    .card-border { border: 1px solid #f1f5f9; border-radius: 16px; overflow: hidden; background: white; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03); }
+    .input-pro { border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; font-size: 14px; width: 100%; background: #fff; transition: 0.2s; }
+    .input-pro:focus { border-color: var(--primary-red); outline: none; box-shadow: 0 0 0 3px rgba(127, 1, 1, 0.1); }
+    .btn-save { background: var(--primary-red); color: white; border-radius: 10px; font-weight: 600; padding: 16px; width: 100%; font-size: 16px; transition: 0.3s; cursor: pointer; }
+    .btn-save:hover { background: #5c0000; }
+    th { font-weight: 600; color: #64748b; padding: 15px; border-bottom: 1px solid #f8fafc; text-align: left; font-size: 13px; text-transform: uppercase; white-space: nowrap; }
+    td { padding: 15px; border-bottom: 1px solid #f8fafc; font-size: 14px; color: #334155; }
+    .day-header { color: #0f172a; font-weight: 700; font-size: 14px; padding-bottom: 10px; border-bottom: 2px solid #f1f5f9; margin-bottom: 15px; text-transform: uppercase; }
+    .day-selector { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 5px; }
+    .day-selector input:checked + span { background: var(--primary-red); color: white; border-color: var(--primary-red); }
+    .day-selector span { display: block; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px; font-weight: 500; background: #f8fafc; transition: 0.2s; cursor: pointer; }
+    .visual-grid-container { min-width: 900px; }
+    .modal-overlay { background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); }
+    .section-title { font-size: 1.5rem; font-weight: 700; color: var(--primary-red); margin-bottom: 1rem; border-left: 4px solid var(--primary-red); padding-left: 10px; }
+  </style>
+</head>
+<body>
+
+  <!-- Modal ลบ -->
+  <div id="deleteModal" class="fixed inset-0 z-[100] flex items-center justify-center hidden modal-overlay">
+    <div class="bg-white w-[90%] max-w-sm p-8 rounded-3xl shadow-2xl text-center">
+      <div class="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4"><i data-lucide="alert-triangle"></i></div>
+      <h3 class="text-xl font-bold">ยืนยันการลบ?</h3>
+      <div class="flex gap-4 mt-8">
+        <button onclick="closeModal()" class="flex-1 text-slate-500 font-bold">ยกเลิก</button>
+        <button id="confirmDeleteBtn" class="flex-1 py-3 bg-[#7f0101] text-white rounded-xl font-bold hover:bg-[#5c0000]">ลบออก</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-container">
+    <!-- แถบด้านซ้ายสำหรับการกรอกข้อมูล -->
+    <aside class="sidebar flex flex-col">
+      <div class="flex justify-between items-center mb-6">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-[#7f0101] rounded-xl flex items-center justify-center text-white shadow-md"><i data-lucide="graduation-cap" class="w-6 h-6"></i></div>
+          <h1 class="text-xl font-bold text-slate-800 tracking-tight">RUniSmart</h1>
+        </div>
+        <button onclick="toggleLang()" id="langBtn" class="text-xs font-bold bg-slate-100 px-3 py-1 rounded-md text-slate-600 hover:bg-slate-200">EN</button>
+      </div>
+
+      <div class="mb-6 p-4 bg-slate-50 rounded-2xl border border-slate-100 text-center">
+        <div id="clock" class="text-4xl font-bold tracking-tighter text-[#7f0101]">00:00:00</div>
+        <div id="date" class="text-xs font-semibold text-slate-500 uppercase tracking-widest mt-1">Loading...</div>
+      </div>
+      
+      <form id="mainForm" class="space-y-4">
+        <input type="hidden" name="targetRow" id="targetRow" value="0">
+        <input type="hidden" name="semester" id="semesterHidden">
+        
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-[10px] font-bold text-slate-500 uppercase" data-th="ปีการศึกษา" data-en="Year">ปีการศึกษา</label>
+            <select id="yearSelect" class="input-pro font-bold" onchange="loadData()">
+              <option value="2567">2567</option><option value="2568">2568</option>
+              <option value="2569" selected>2569</option><option value="2570">2570</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-[10px] font-bold text-slate-500 uppercase" data-th="ภาคเรียน" data-en="Term">ภาคเรียน</label>
+            <select id="termSelect" class="input-pro font-bold" onchange="loadData()">
+              <option value="ภาคเรียนที่ 1">ภาคเรียนที่ 1</option>
+              <option value="ภาคเรียนที่ 2">ภาคเรียนที่ 2</option>
+              <option value="ภาคฤดูร้อน">ภาคฤดูร้อน</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2">
+          <div class="col-span-1"><input type="text" name="courseId" id="courseId" placeholder="รหัสวิชา" class="input-pro font-bold uppercase" required></div>
+          <div class="col-span-2"><input type="text" name="courseName" id="courseName" placeholder="ชื่อรายวิชา" class="input-pro" required></div>
+        </div>
+        
+        <div>
+          <label class="text-[10px] font-bold text-slate-500 uppercase" data-th="วันเรียน" data-en="Study Days">วันเรียน</label>
+          <div class="day-selector">
+            <label><input type="checkbox" name="days" value="วันจันทร์" class="hidden"><span data-th="จ." data-en="Mon">จ.</span></label>
+            <label><input type="checkbox" name="days" value="วันอังคาร" class="hidden"><span data-th="อ." data-en="Tue">อ.</span></label>
+            <label><input type="checkbox" name="days" value="วันพุธ" class="hidden"><span data-th="พ." data-en="Wed">พ.</span></label>
+            <label><input type="checkbox" name="days" value="วันพฤหัสบดี" class="hidden"><span data-th="พฤ." data-en="Thu">พฤ.</span></label>
+            <label><input type="checkbox" name="days" value="วันศุกร์" class="hidden"><span data-th="ศ." data-en="Fri">ศ.</span></label>
+            <label><input type="checkbox" name="days" value="วันเสาร์" class="hidden"><span data-th="ส." data-en="Sat">ส.</span></label>
+            <label><input type="checkbox" name="days" value="วันอาทิตย์" class="hidden"><span data-th="อา." data-en="Sun">อา.</span></label>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div><label class="text-[10px] font-bold text-slate-500">เวลาเริ่ม</label><input type="time" name="startTime" id="startTime" class="input-pro"></div>
+          <div><label class="text-[10px] font-bold text-slate-500">เวลาจบ</label><input type="time" name="endTime" id="endTime" class="input-pro"></div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <input type="text" name="room" id="room" placeholder="ห้องเรียน" class="input-pro">
+          <input type="text" name="teacher" id="teacher" placeholder="ชื่อผู้สอน" class="input-pro">
+        </div>
+        
+        <div class="pt-4 border-t border-slate-100 space-y-2 mt-2">
+          <p class="text-[11px] font-bold text-[#7f0101] uppercase" data-th="กำหนดการสอบ" data-en="Exam Schedule"><i data-lucide="file-text" class="w-3 h-3 inline"></i> กำหนดการสอบ</p>
+          <input type="date" name="examDate" id="examDate" class="input-pro">
+          <div class="grid grid-cols-2 gap-2">
+            <input type="time" name="examStartTime" id="examStartTime" class="input-pro">
+            <input type="time" name="examEndTime" id="examEndTime" class="input-pro">
+          </div>
+        </div>
+        
+        <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 mt-2">
+          <div class="flex items-center gap-2 text-[#7f0101]">
+            <i data-lucide="message-circle" class="w-4 h-4"></i>
+            <span class="text-sm font-bold" data-th="แจ้งเตือนลง LINE" data-en="Send LINE Notify">แจ้งเตือนลง LINE</span>
+          </div>
+          <input type="checkbox" name="notifyLine" id="notifyLine" value="true" checked class="w-5 h-5 cursor-pointer" style="accent-color: #7f0101;">
+        </div>
+        <button type="submit" id="subBtn" class="btn-save flex items-center justify-center gap-2 mt-4 shadow-lg shadow-red-900/20"><i data-lucide="save"></i> <span data-th="บันทึกข้อมูล" data-en="Save Data">บันทึกข้อมูล</span></button>
+      </form>
+    </aside>
+
+    <main class="main-content space-y-8">
+      <!-- 🎓 ส่วนแดชบอร์ดตารางเรียน -->
+      <section>
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-4">
+          <div>
+            <h2 class="section-title" data-th="แดชบอร์ดตารางเรียน" data-en="Class Dashboard">แดชบอร์ดตารางเรียน</h2>
+            <div class="relative mt-2 w-full md:w-80">
+              <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4"></i>
+              <input type="text" id="searchInputClass" onkeyup="filterTable('dataTable')" placeholder="ค้นหาวิชาเรียน..." class="input-pro pl-10">
+            </div>
+          </div>
+          <button onclick="downloadImg()" class="p-2.5 bg-white text-[#7f0101] rounded-xl border border-[#7f0101]/20 hover:bg-red-50 transition flex items-center gap-2 font-bold shadow-sm">
+            <i data-lucide="download" class="w-4 h-4"></i> <span class="text-sm" data-th="บันทึกภาพตาราง" data-en="Export Image">บันทึกภาพตาราง</span>
+          </button>
+        </header>
+
+        <div class="overflow-x-auto card-border mb-6">
+          <div id="captureArea" class="p-6 bg-white visual-grid-container relative">
+            <!-- ตราสัญลักษณ์ (Optional) วางจางๆ -->
+            <div class="absolute inset-0 flex items-center justify-center opacity-[0.02] pointer-events-none">
+              <i data-lucide="book-open" class="w-96 h-96"></i>
+            </div>
+            
+            <div class="grid grid-cols-7 gap-4 relative z-10">
+              <div class="text-center"><p class="day-header text-amber-500 border-amber-100">MON</p><div id="Mon" class="space-y-2"></div></div>
+              <div class="text-center"><p class="day-header text-pink-500 border-pink-100">TUE</p><div id="Tue" class="space-y-2"></div></div>
+              <div class="text-center"><p class="day-header text-emerald-500 border-emerald-100">WED</p><div id="Wed" class="space-y-2"></div></div>
+              <div class="text-center"><p class="day-header text-orange-500 border-orange-100">THU</p><div id="Thu" class="space-y-2"></div></div>
+              <div class="text-center"><p class="day-header text-blue-500 border-blue-100">FRI</p><div id="Fri" class="space-y-2"></div></div>
+              <div class="text-center"><p class="day-header text-purple-500 border-purple-100">SAT</p><div id="Sat" class="space-y-2"></div></div>
+              <div class="text-center"><p class="day-header text-red-500 border-red-100">SUN</p><div id="Sun" class="space-y-2"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-border overflow-hidden bg-white">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left" id="dataTable">
+              <thead class="bg-slate-50"><tr id="tableHead"></tr></thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 📝 ส่วนแดชบอร์ดตารางสอบ (แยกออกมาใหม่) -->
+      <section class="mt-12 pt-8 border-t border-slate-200">
+        <header class="flex flex-col md:flex-row justify-between items-start gap-4 mb-4">
+          <div>
+            <h2 class="section-title !border-slate-800 !text-slate-800" data-th="แดชบอร์ดตารางสอบ" data-en="Exam Dashboard">แดชบอร์ดตารางสอบ</h2>
+            <div class="relative mt-2 w-full md:w-80">
+              <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4"></i>
+              <input type="text" id="searchInputExam" onkeyup="filterTable('examTable')" placeholder="ค้นหาวิชาสอบ..." class="input-pro pl-10">
+            </div>
+          </div>
+        </header>
+
+        <div class="card-border overflow-hidden bg-white">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left" id="examTable">
+              <thead class="bg-slate-800 text-white"><tr id="examTableHead"></tr></thead>
+              <tbody id="examTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+      
+    </main>
+  </div>
+
+  <script>
+    // 🔴🔴🔴 สิ่งสำคัญ: นำ URL ของ Web App ที่ได้จากฝั่ง Apps Script มาวางตรงนี้ค่ะ 🔴🔴🔴
+    const API_URL = "YOUR_WEB_APP_URL"; 
+
+    lucide.createIcons();
+    let globalData = [];
+    let deleteTargetRow = null;
+    let deleteTargetId = null;
+    let currentLang = 'th';
+
+    function getSemesterStr() {
+      return document.getElementById('termSelect').value + " " + document.getElementById('yearSelect').value;
+    }
+
+    function runClock() {
+      const now = new Date();
+      document.getElementById('clock').innerText = now.toLocaleTimeString(currentLang === 'th' ? 'th-TH' : 'en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      document.getElementById('date').innerText = now.toLocaleDateString(currentLang === 'th' ? 'th-TH' : 'en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    async function loadData() {
+      if(API_URL === "YOUR_WEB_APP_URL") { alert("อย่าลืมใส่ API URL ตรงบรรทัดที่ 196 นะคะ!"); return; }
+      const sem = getSemesterStr();
+      document.getElementById('semesterHidden').value = sem;
+      document.getElementById('targetRow').value = "0";
+      document.getElementById('tableBody').innerHTML = `<tr><td colspan="8" class="p-10 text-center text-slate-400">กำลังโหลดข้อมูลตารางเรียน...</td></tr>`;
+      document.getElementById('examTableBody').innerHTML = `<tr><td colspan="7" class="p-10 text-center text-slate-400">กำลังโหลดข้อมูลตารางสอบ...</td></tr>`;
+      
+      try {
+        const response = await fetch(`${API_URL}?action=getData&semester=${encodeURIComponent(sem)}`);
+        const data = await response.json();
+        drawUI(data);
+      } catch (error) {
+        console.error("Error loading data:", error);
+        document.getElementById('tableBody').innerHTML = `<tr><td colspan="8" class="p-10 text-center text-red-500">เกิดข้อผิดพลาดในการโหลดข้อมูล</td></tr>`;
+      }
+    }
+
+    window.onload = () => { setInterval(runClock, 1000); runClock(); loadData(); applyLanguage(); };
+
+    function toggleLang() {
+      currentLang = currentLang === 'th' ? 'en' : 'th';
+      document.getElementById('langBtn').innerText = currentLang === 'th' ? 'EN' : 'TH';
+      applyLanguage();
+      drawUI(globalData); 
+    }
+
+    function applyLanguage() {
+      document.querySelectorAll('[data-th]').forEach(el => {
+        if(el.tagName === 'INPUT' && el.type === 'text') el.placeholder = el.getAttribute(`data-${currentLang}`);
+        else el.innerText = el.getAttribute(`data-${currentLang}`);
+      });
+      runClock();
+    }
+
+    function filterTable(tableId) {
+      const inputId = tableId === 'dataTable' ? 'searchInputClass' : 'searchInputExam';
+      const input = document.getElementById(inputId).value.toUpperCase();
+      const rows = document.getElementById(tableId).getElementsByTagName("tbody")[0].getElementsByTagName("tr");
+      for (let row of rows) { row.style.display = row.innerText.toUpperCase().includes(input) ? "" : "none"; }
+    }
+
+    function formatBE(dateStr) {
+      if (!dateStr || dateStr === '-') return '-';
+      const d = new Date(dateStr);
+      if(currentLang === 'th') return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${(d.getFullYear()+543).toString()}`;
+      return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
+    }
+
+    function drawUI(data) {
+      if(!data || !Array.isArray(data)) return;
+      globalData = data;
+      drawClassTable(data);
+      drawExamTable(data);
+      drawVisual(data);
+    }
+
+    // 🎓 วาดตารางเรียน
+    function drawClassTable(data) {
+      const body = document.getElementById('tableBody');
+      const head = document.getElementById('tableHead');
+      const thLabels = currentLang === 'th' 
+        ? ['วันเรียน', 'เวลา', 'รหัส', 'วิชา', 'ห้อง', 'ผู้สอน', 'จัดการ']
+        : ['Days', 'Time', 'Code', 'Subject', 'Room', 'Instructor', 'Action'];
+      
+      head.innerHTML = thLabels.map(h => `<th>${h}</th>`).join('');
+      if(data.length <= 1) {
+         body.innerHTML = `<tr><td colspan="7" class="p-10 text-center text-slate-400">ยังไม่มีข้อมูลตารางเรียนในภาคเรียนนี้</td></tr>`; return;
+      }
+
+      body.innerHTML = data.slice(1).map((r, i) => `
+        <tr id="row-${i+2}" class="hover:bg-slate-50 transition-all">
+          <td class="font-bold text-[#7f0101] text-xs max-w-[100px] truncate" title="${r[0]}">${r[0]}</td>
+          <td class="text-slate-600 font-medium whitespace-nowrap">${r[1]}</td>
+          <td class="text-slate-400 font-mono text-xs">${r[2]}</td>
+          <td class="font-bold text-slate-800 uppercase">${r[3]}</td>
+          <td class="text-slate-500 text-xs">${r[4] || '-'}</td>
+          <td class="text-slate-500 text-xs">${r[7] || '-'}</td>
+          <td class="p-2 text-right whitespace-nowrap">
+            <button onclick="editItem(${i+2})" class="text-slate-400 p-2 hover:text-[#7f0101] transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+            <button onclick="openModal(${i+2}, '${r[2]}')" class="text-slate-400 p-2 hover:text-red-500 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+          </td>
+        </tr>
+      `).join('');
+      lucide.createIcons();
+    }
+
+    // 📝 วาดตารางสอบ (กรองเอาแค่วิชาที่มีวันสอบ)
+    function drawExamTable(data) {
+      const body = document.getElementById('examTableBody');
+      const head = document.getElementById('examTableHead');
+      const thLabels = currentLang === 'th' 
+        ? ['วันที่สอบ', 'เวลาสอบ', 'รหัส', 'วิชา', 'ห้องสอบ', 'ผู้สอน', 'แก้ไข']
+        : ['Exam Date', 'Exam Time', 'Code', 'Subject', 'Room', 'Instructor', 'Edit'];
+      
+      // ลบพวกคลาสสีๆ บน th เพราะตั้งให้ thead ดำไปแล้ว
+      head.innerHTML = thLabels.map(h => `<th style="color:white; border-bottom:none;">${h}</th>`).join('');
+      
+      const examData = data.slice(1).map((r, idx) => ({r, originalIdx: idx + 2})).filter(item => item.r[5] && item.r[5] !== '-' && item.r[5].trim() !== '');
+
+      if(examData.length === 0) {
+         body.innerHTML = `<tr><td colspan="7" class="p-10 text-center text-slate-400">ยังไม่มีข้อมูลการสอบในภาคเรียนนี้</td></tr>`; return;
+      }
+
+      // เรียงลำดับตามวันที่สอบ (จากใกล้ไปไกล)
+      examData.sort((a, b) => new Date(a.r[5]) - new Date(b.r[5]));
+
+      body.innerHTML = examData.map(item => {
+        const r = item.r;
+        const i = item.originalIdx;
+        
+        // เช็คว่าใกล้สอบหรือยัง
+        const today = new Date(); today.setHours(0,0,0,0);
+        const examD = new Date(r[5]); examD.setHours(0,0,0,0);
+        const diffDays = Math.round((examD - today) / (1000 * 60 * 60 * 24));
+        let statusBadge = "";
+        
+        if (diffDays === 0) statusBadge = `<span class="bg-red-500 text-white px-2 py-1 rounded text-[10px] ml-2 animate-pulse">สอบวันนี้!</span>`;
+        else if (diffDays > 0 && diffDays <= 7) statusBadge = `<span class="bg-orange-500 text-white px-2 py-1 rounded text-[10px] ml-2">อีก ${diffDays} วัน</span>`;
+
+        return `
+        <tr class="hover:bg-slate-50 transition-all border-l-4 ${diffDays === 0 ? 'border-red-500' : diffDays <= 7 ? 'border-orange-400' : 'border-transparent'}">
+          <td class="font-bold text-slate-800 whitespace-nowrap">${formatBE(r[5])} ${statusBadge}</td>
+          <td class="text-rose-600 font-bold whitespace-nowrap">${r[6] || '-'}</td>
+          <td class="text-slate-400 font-mono text-xs">${r[2]}</td>
+          <td class="font-bold text-slate-800 uppercase">${r[3]}</td>
+          <td class="text-slate-500 text-sm font-medium">${r[4] || '-'}</td>
+          <td class="text-slate-500 text-xs">${r[7] || '-'}</td>
+          <td class="p-2 text-right whitespace-nowrap">
+            <button onclick="editItem(${i})" class="text-slate-400 p-2 hover:text-[#7f0101] transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+          </td>
+        </tr>
+      `}).join('');
+      lucide.createIcons();
+    }
+
+    function drawVisual(data) {
+      const mapTH = {'วันจันทร์': 'Mon', 'วันอังคาร': 'Tue', 'วันพุธ': 'Wed', 'วันพฤหัสบดี': 'Thu', 'วันศุกร์': 'Fri', 'วันเสาร์': 'Sat', 'วันอาทิตย์': 'Sun'};
+      const mapEN = {'Mon': 'Mon', 'Tue': 'Tue', 'Wed': 'Wed', 'Thu': 'Thu', 'Fri': 'Fri', 'Sat': 'Sat', 'Sun': 'Sun'};
+      ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(id => document.getElementById(id).innerHTML = '');
+      
+      if(data.length <= 1) return;
+      data.slice(1).forEach(r => {
+        const rowDays = r[0].split(', ');
+        // ปรับเป็นโทนสีขาว-แดงเลือดหมูเป็นหลัก ถ้าผู้ใช้ไม่ได้เลือกสี
+        const themeClass = "bg-white border-slate-200 text-[#7f0101] border-l-4 border-l-[#7f0101]"; 
+        
+        rowDays.forEach(d => {
+          let target = mapTH[d.trim()] || mapEN[d.trim()];
+          if(target) {
+            const div = document.createElement('div');
+            div.className = `p-3 rounded-xl text-[11px] shadow-sm flex flex-col gap-1 transition-all hover:shadow-md ${themeClass}`;
+            div.innerHTML = `
+              <p class="font-bold truncate uppercase text-xs text-slate-800">${r[3]}</p>
+              <div class="flex justify-between items-center text-slate-500"><span class="font-medium text-[#7f0101]"><i data-lucide="clock" class="w-3 h-3 inline"></i> ${r[1]}</span><span>${r[4] || ''}</span></div>
+            `;
+            document.getElementById(target).appendChild(div);
+          }
+        });
+      });
+      lucide.createIcons();
+    }
+
+    // บันทึกข้อมูลแบบ Fetch (POST)
+    document.getElementById('mainForm').onsubmit = async function(e) {
+      e.preventDefault();
+      const btn = document.getElementById('subBtn');
+      btn.disabled = true; btn.innerHTML = '<i data-lucide="loader" class="animate-spin w-4 h-4"></i> กำลังบันทึก...';
+      
+      const formData = Object.fromEntries(new FormData(this).entries());
+      const daysCheckboxes = document.querySelectorAll('input[name="days"]:checked');
+      formData.days = Array.from(daysCheckboxes).map(cb => cb.value);
+
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'save', data: formData })
+        });
+        const result = await response.json();
+        
+        if(result.status === 'success') {
+          drawUI(result.data); 
+          document.getElementById('targetRow').value = "0";
+          document.getElementById('courseId').value = ""; document.getElementById('courseName').value = "";
+          document.querySelectorAll('input[name="days"]').forEach(cb => cb.checked = false);
+        } else {
+          alert("เกิดข้อผิดพลาด: " + result.message);
+        }
+      } catch (error) {
+        alert("ไม่สามารถเชื่อมต่อ API ได้ กรุณาตรวจสอบ URL");
+      }
+      
+      btn.disabled = false; btn.innerHTML = '<i data-lucide="save"></i> ' + (currentLang === 'th' ? 'บันทึกข้อมูล' : 'Save Data'); 
+      lucide.createIcons();
+    };
+
+    function editItem(rowIdx) {
+      const r = globalData[rowIdx-1]; 
+      document.getElementById('targetRow').value = rowIdx;
+      document.getElementById('courseId').value = r[2];
+      document.getElementById('courseName').value = r[3];
+      const dayArr = r[0].split(', ');
+      document.querySelectorAll('input[name="days"]').forEach(cb => cb.checked = dayArr.includes(cb.value) || dayArr.includes(cb.getAttribute(`data-${currentLang}`)));
+      const t = r[1].split('-'); document.getElementById('startTime').value = t[0] || ''; document.getElementById('endTime').value = t[1] || '';
+      document.getElementById('room').value = r[4]; document.getElementById('examDate').value = r[5] || '';
+      const et = r[6] ? r[6].split('-') : []; document.getElementById('examStartTime').value = et[0] || ''; document.getElementById('examEndTime').value = et[1] || '';
+      document.getElementById('teacher').value = r[7] || '';
+      if(window.innerWidth < 1024) window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function openModal(rowIdx, id) { deleteTargetRow = rowIdx; deleteTargetId = id; document.getElementById('deleteModal').classList.remove('hidden'); }
+    function closeModal() { document.getElementById('deleteModal').classList.add('hidden'); }
+    
+    // ลบข้อมูลแบบ Fetch (POST)
+    document.getElementById('confirmDeleteBtn').onclick = async function() {
+      const btn = this; btn.innerText = "กำลังลบ..."; btn.disabled = true;
+      const semester = getSemesterStr();
+      const isNotify = document.getElementById('notifyLine').checked; 
+      
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'delete', rowIdx: deleteTargetRow, courseId: deleteTargetId, semester: semester, isNotify: isNotify })
+        });
+        const result = await response.json();
+        
+        if(result.status === 'success') {
+          closeModal();
+          drawUI(result.data);
+        }
+      } catch (error) { alert("เกิดข้อผิดพลาดในการลบข้อมูล"); }
+      btn.innerText = "ลบออก"; btn.disabled = false;
+    };
+
+    async function downloadImg() {
+      if (typeof html2canvas === 'undefined') return alert("🚨 โหลดระบบจับภาพไม่สำเร็จ!");
+      const captureArea = document.querySelector("#captureArea");
+      if (!captureArea) return;
+
+      const btn = event.currentTarget;
+      const oldHtml = btn.innerHTML;
+      btn.innerHTML = `<i data-lucide="loader" class="animate-spin w-4 h-4"></i> <span>รอสักครู่...</span>`; btn.disabled = true; lucide.createIcons();
+
+      const originalPadding = captureArea.style.padding;
+      captureArea.style.padding = '20px';
+
+      try {
+        const canvas = await html2canvas(captureArea, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+        captureArea.style.padding = originalPadding;
+        btn.innerHTML = oldHtml; btn.disabled = false; lucide.createIcons();
+        
+        const imgUrl = canvas.toDataURL("image/png");
+        
+        if (/iPhone|iPad|iPod|LINE|Android/i.test(navigator.userAgent)) {
+           const div = document.createElement('div');
+           div.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; text-align:center; padding:30px 20px; box-sizing:border-box; overflow-y:auto; backdrop-filter:blur(5px);";
+           div.innerHTML = `
+             <h3 style="color:white; margin-bottom:15px; font-family:sans-serif;">แตะค้างที่รูปเพื่อบันทึกนะคะ 👇</h3>
+             <img src="${imgUrl}" style="max-width:100%; border-radius:15px; border:2px solid white; box-shadow:0 10px 20px rgba(0,0,0,0.5);">
+             <br><button onclick="this.parentElement.remove()" style="margin-top:25px; padding:12px 25px; border-radius:10px; background:#7f0101; color:white; border:none; font-size:16px; font-weight:bold; cursor:pointer;">❌ ปิดหน้าต่าง</button>
+           `;
+           document.body.appendChild(div);
+        } else {
+           const link = document.createElement('a');
+           link.download = `ตารางเรียน_${document.getElementById('termSelect').value}.png`;
+           link.href = imgUrl; link.click();
+        }
+      } catch (err) {
+        captureArea.style.padding = originalPadding;
+        btn.innerHTML = oldHtml; btn.disabled = false;
+        alert("เกิดข้อผิดพลาดในการบันทึกภาพค่ะ");
+      }
+    }
+  </script>
+</body>
+</html>
