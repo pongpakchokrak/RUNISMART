@@ -9,9 +9,9 @@
 <link rel="icon" type="image/png" href="https://i.postimg.cc/FKbvSg2F/d-sin-th-y-ngmi-di-t-ngch-x.png">
 <!-- 2. สำหรับรูปไอคอนตอนเพิ่มลงหน้าโฮม iPhone (Apple Touch Icon) -->
 <link rel="apple-touch-icon" href="https://i.postimg.cc/d1qYjZYS/d-sin-th-y-ngmi-di-t-ngch-x.png">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -83,6 +83,15 @@
           </div>
         </div>
         <div>
+  <label class="text-[11px] font-bold text-slate-500 uppercase" data-th="แจ้งเตือนก่อนสอบ (นาที)" data-en="Alert Before Exam (min)">แจ้งเตือนก่อนสอบ (นาที)</label>
+  <select id="setExamLead" class="input-pro mt-1">
+    <option value="15">15</option>
+    <option value="30" selected>30</option>
+    <option value="45">45</option>
+    <option value="60">60</option>
+  </select>
+</div>
+        <div>
            <label class="text-[11px] font-bold text-slate-500 uppercase" data-th="ภาคเรียนที่ให้แจ้งเตือน" data-en="Active Term Alert">ภาคเรียนที่ให้แจ้งเตือน</label>
            <input type="text" id="setNotifySemester" class="input-pro mt-1 bg-slate-50" readonly>
            <p class="text-[10px] text-rose-500 mt-1" data-th="* ระบบจะยึดตามภาคเรียนที่คุณเลือกอยู่ปัจจุบัน" data-en="* Based on your currently selected term.">* ระบบจะยึดตามภาคเรียนที่คุณเลือกอยู่ปัจจุบัน</p>
@@ -119,10 +128,7 @@
         <div class="grid grid-cols-2 gap-2">
           <div>
             <label class="text-[10px] font-bold text-slate-500 uppercase" data-th="ปีการศึกษา" data-en="Year">ปีการศึกษา</label>
-            <select id="yearSelect" class="input-pro font-bold text-rose-600 bg-rose-50" onchange="loadData()">
-              <option value="2567">2567</option><option value="2568">2568</option>
-              <option value="2569" selected>2569</option><option value="2570">2570</option>
-            </select>
+            <select id="yearSelect" class="input-pro font-bold text-rose-600 bg-rose-50" onchange="loadData()"></select>
           </div>
           <div>
             <label class="text-[10px] font-bold text-slate-500 uppercase" data-th="ภาคเรียน" data-en="Term">ภาคเรียน</label>
@@ -274,6 +280,18 @@
     let deleteTargetRow = null;
     let deleteTargetId = null;
     let currentLang = 'th';
+        function buildYearOptions() {
+      const sel = document.getElementById('yearSelect');
+      const currentBE = new Date().getFullYear() + 543;
+      const startBE = 2560;
+      const endBE = currentBE + 15;
+      let html = '';
+      for (let y = startBE; y <= endBE; y++) {
+        html += `<option value="${y}" ${y === currentBE ? 'selected' : ''}>${y}</option>`;
+      }
+      sel.innerHTML = html;
+    }
+    buildYearOptions();
 
     function getSemesterStr() {
       // สำหรับดึงค่าจริง โดยอาจจะต้องแปลงค่า dropdown กลับเป็นภาษาไทยเพื่อให้ฝั่ง Google Sheet บันทึกถูก tab เสมอ
@@ -288,22 +306,32 @@
     }
 
     async function loadData() {
-      const sem = getSemesterStr();
-      document.getElementById('semesterHidden').value = sem;
-      document.getElementById('targetRow').value = "0";
-      
-      const loadingTxt = currentLang === 'th' ? "กำลังโหลดข้อมูล..." : "Loading Data...";
-      document.getElementById('tableBody').innerHTML = `<tr><td colspan="7" class="p-10 text-center text-slate-400">${loadingTxt}</td></tr>`;
-      document.getElementById('examTableBody').innerHTML = `<tr><td colspan="7" class="p-10 text-center text-slate-400">${loadingTxt}</td></tr>`;
-      
-      try {
-        const response = await fetch(`${API_URL}?action=getData&semester=${encodeURIComponent(sem)}`);
-        const data = await response.json();
-        drawUI(data);
-      } catch (error) {
-        document.getElementById('tableBody').innerHTML = `<tr><td colspan="7" class="p-10 text-center text-red-500">Error Loading Data</td></tr>`;
-      }
-    }
+  const sem = getSemesterStr();
+  document.getElementById('semesterHidden').value = sem;
+  document.getElementById('targetRow').value = "0";
+
+  const cacheKey = 'rs_' + sem;
+  let hasCache = false;
+  try {
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) { drawUI(JSON.parse(cached)); hasCache = true; }
+  } catch (e) {}
+
+  if (!hasCache) {
+    const loadingTxt = currentLang === 'th' ? "กำลังโหลดข้อมูล..." : "Loading Data...";
+    document.getElementById('tableBody').innerHTML = `<tr><td colspan="7" class="p-10 text-center text-slate-400">${loadingTxt}</td></tr>`;
+    document.getElementById('examTableBody').innerHTML = `<tr><td colspan="7" class="p-10 text-center text-slate-400">${loadingTxt}</td></tr>`;
+  }
+
+  try {
+    const response = await fetch(`${API_URL}?action=getData&semester=${encodeURIComponent(sem)}`);
+    const data = await response.json();
+    try { sessionStorage.setItem(cacheKey, JSON.stringify(data)); } catch (e) {}
+    drawUI(data);
+  } catch (error) {
+    if (!hasCache) document.getElementById('tableBody').innerHTML = `<tr><td colspan="7" class="p-10 text-center text-red-500">Error Loading Data</td></tr>`;
+  }
+}
 
     window.onload = () => { 
       setInterval(runClock, 1000); 
@@ -346,12 +374,13 @@
     }
 
     function drawUI(data) {
-      if(!data || !Array.isArray(data)) return;
-      globalData = data;
-      drawClassTable(data);
-      drawExamTable(data);
-      drawVisual(data);
-    }
+  if(!data || !Array.isArray(data)) return;
+  globalData = data;
+  drawClassTable(data);
+  drawExamTable(data);
+  drawVisual(data);
+  lucide.createIcons();
+}
 
     function drawClassTable(data) {
       const body = document.getElementById('tableBody');
@@ -385,8 +414,7 @@
             <button onclick="openModal(${i+2}, '${r[2]}')" class="text-rose-500 p-2 hover:bg-rose-50 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
           </td>
         </tr>
-      `}).join('');
-      lucide.createIcons();
+            `}).join('');
     }
 
     function drawExamTable(data) {
@@ -423,7 +451,6 @@
           </td>
         </tr>
       `}).join('');
-      lucide.createIcons();
     }
 
     function drawVisual(data) {
@@ -479,6 +506,7 @@
         
         if(result.status === 'success') {
           drawUI(result.data); 
+          try { sessionStorage.setItem('rs_' + getSemesterStr(), JSON.stringify(result.data)); } catch (e) {}
           document.getElementById('targetRow').value = "0";
           document.getElementById('courseId').value = ""; document.getElementById('courseName').value = "";
           document.querySelectorAll('input[name="days"]').forEach(cb => cb.checked = false);
@@ -525,9 +553,10 @@
         });
         const result = await response.json();
         
-        if(result.status === 'success') {
+                if(result.status === 'success') {
           closeModal();
           drawUI(result.data);
+          try { sessionStorage.setItem('rs_' + getSemesterStr(), JSON.stringify(result.data)); } catch (e) {}
         }
       } catch (error) { alert("เกิดข้อผิดพลาดในการลบข้อมูล"); }
       btn.innerText = currentLang === 'th' ? "ลบออก" : "Delete"; btn.disabled = false;
@@ -575,6 +604,7 @@
            if(props.START_DATE) document.getElementById('setStartDate').value = props.START_DATE;
            if(props.CLASS_HOUR) document.getElementById('setClassHour').value = props.CLASS_HOUR;
            if(props.EXAM_HOUR) document.getElementById('setExamHour').value = props.EXAM_HOUR;
+           if(props.EXAM_LEAD_MIN) document.getElementById('setExamLead').value = props.EXAM_LEAD_MIN;
         }
       } catch (e) { console.error("Error loading settings"); }
     }
@@ -589,7 +619,8 @@
         startDate: document.getElementById('setStartDate').value,
         classHour: document.getElementById('setClassHour').value,
         examHour: document.getElementById('setExamHour').value,
-        notifySemester: document.getElementById('setNotifySemester').value
+        notifySemester: document.getElementById('setNotifySemester').value,
+        examLeadMin: document.getElementById('setExamLead').value
       };
       
       try {
