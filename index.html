@@ -41,7 +41,7 @@
   </style>
 </head>
 <body>
-
+    <div id="toastBox" class="fixed top-4 right-4 z-[200] space-y-2 pointer-events-none"></div>
   <!-- Modal ลบ -->
   <div id="deleteModal" class="fixed inset-0 z-[100] flex items-center justify-center hidden modal-overlay">
     <div class="bg-white w-[90%] max-w-sm p-8 rounded-3xl shadow-2xl text-center">
@@ -99,13 +99,10 @@
         </div>
       </div>
             <div class="mt-5 pt-4 border-t border-slate-100">
-        <p class="text-[11px] font-bold text-slate-500 uppercase mb-2">วันหยุด (งดแจ้งเตือนเรียน)</p>
-        <div class="grid grid-cols-5 gap-2">
-          <input type="text" id="holDate" maxlength="5" placeholder="dd/MM" class="input-pro col-span-2">
-          <input type="text" id="holName" placeholder="ชื่อวันหยุด" class="input-pro col-span-3">
-        </div>
-        <button type="button" onclick="addHolidayBtn()" class="w-full mt-2 py-2 bg-rose-50 text-rose-600 border border-rose-200 rounded-xl font-bold text-sm">+ เพิ่ม / แก้ไขวันหยุด</button>
-      <div id="holList" class="mt-3 max-h-40 overflow-y-auto space-y-1 text-sm"></div>
+        <p class="text-[11px] font-bold text-slate-500 uppercase mb-1">วันหยุด (งดแจ้งเตือนเรียน)</p>
+        <p class="text-[10px] text-slate-400 mb-2">พิมพ์ได้หลายบรรทัด รูปแบบ <b>dd/MM ชื่อวันหยุด</b> เช่น 15/08 วันสถาปนารามคำแหง</p>
+        <textarea id="holBulk" rows="3" placeholder="15/08 วันสถาปนารามคำแหง&#10;20/09 วันหยุดพิเศษ" class="input-pro"></textarea>
+        <div id="holList" class="mt-3 max-h-40 overflow-y-auto space-y-1 text-sm"></div>
       </div>
       </div>
       <div class="px-5 py-4 border-t border-slate-100 shrink-0">
@@ -293,6 +290,16 @@
     let deleteTargetRow = null;
     let deleteTargetId = null;
     let currentLang = 'th';
+        function toast(msg, type) {
+      const box = document.getElementById('toastBox');
+      const el = document.createElement('div');
+      const color = type === 'error' ? 'bg-red-500' : (type === 'info' ? 'bg-slate-700' : 'bg-emerald-500');
+      el.className = `${color} text-white px-4 py-3 rounded-xl shadow-lg text-sm font-bold`;
+      el.style.transition = 'opacity .3s';
+      el.textContent = msg;
+      box.appendChild(el);
+      setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 2800);
+    }
         async function apiPost(body, tries = 3) {
       for (let i = 0; i < tries; i++) {
         try {
@@ -515,41 +522,55 @@
       });
     }
 
-    document.getElementById('mainForm').onsubmit = async function(e) {
+        document.getElementById('mainForm').onsubmit = function(e) {
       e.preventDefault();
-      const btn = document.getElementById('subBtn');
-      btn.disabled = true; btn.style.opacity = '0.5';
-      const subBtnHtml = btn.innerHTML;
-      btn.innerText = currentLang === 'th' ? "กำลังบันทึก..." : "Saving...";
-      
       const formData = Object.fromEntries(new FormData(this).entries());
-      const daysCheckboxes = document.querySelectorAll('input[name="days"]:checked');
-      // เก็บค่าเป็นภาษาไทยเสมอ เพื่อให้หาเจอในตารางได้ง่ายๆ แม้เปลี่ยนภาษาหน้าเว็บ
-      formData.days = Array.from(daysCheckboxes).map(cb => cb.value);
+      formData.days = Array.from(document.querySelectorAll('input[name="days"]:checked')).map(cb => cb.value);
       formData.notifyLine = document.getElementById('notifyLine').checked;
       formData.isClosed = document.getElementById('isClosed').checked;
-      
-      // ดึง Semester กลับไปเป็นภาษาไทยเสมอเพื่อหา Sheet ให้เจอ
-      formData.semester = document.getElementById('termSelect').options[document.getElementById('termSelect').selectedIndex].getAttribute('data-th') + " " + document.getElementById('yearSelect').value;
+      const semEl = document.getElementById('termSelect');
+      formData.semester = semEl.options[semEl.selectedIndex].getAttribute('data-th') + " " + document.getElementById('yearSelect').value;
 
-            try {
-        const result = await apiPost({ action: 'save', data: formData });
-        
-        if(result.status === 'success') {
+      // ---- อัปเดตหน้าจอทันที (ยังไม่รอเซิร์ฟเวอร์) ----
+      const rowIdx = parseInt(formData.targetRow) || 0;
+      const row = [
+        formData.days.join(', '),
+        (formData.startTime || '') + '-' + (formData.endTime || ''),
+        (formData.courseId || '').toUpperCase(),
+        formData.courseName, formData.room || '', formData.examDate || '',
+        (formData.examStartTime || '') + '-' + (formData.examEndTime || ''),
+        formData.teacher || '', formData.colorTheme,
+        formData.examRoom || formData.room || '',
+        formData.isClosed ? 'ปิดคลาส' : 'กำลังเรียน'
+      ];
+      const backup = JSON.parse(JSON.stringify(globalData));
+      const optimistic = JSON.parse(JSON.stringify(globalData));
+      if (rowIdx > 1 && optimistic[rowIdx - 1]) optimistic[rowIdx - 1] = row;
+      else optimistic.push(row);
+      drawUI(optimistic);
+
+      // ---- ล้างฟอร์มทันที ----
+      document.getElementById('targetRow').value = "0";
+      document.getElementById('courseId').value = ""; document.getElementById('courseName').value = "";
+      document.querySelectorAll('input[name="days"]').forEach(cb => cb.checked = false);
+      document.getElementById('isClosed').checked = false;
+      toast(currentLang === 'th' ? 'กำลังบันทึก...' : 'Saving...', 'info');
+
+      // ---- ส่งเบื้องหลัง ----
+      apiPost({ action: 'save', data: formData }).then(result => {
+        if (result.status === 'success') {
           drawUI(result.data);
-          if (result.notify) {
-            apiPost({ action: 'notifySaved', data: { row: result.row, semester: result.semester, isEdit: result.isEdit, closed: result.closed } }).catch(()=>{});
-          }
-          try { sessionStorage.setItem('rs_' + getSemesterStr(), JSON.stringify(result.data)); } catch (e) {}
-          document.getElementById('targetRow').value = "0";
-          document.getElementById('courseId').value = ""; document.getElementById('courseName').value = "";
-          document.querySelectorAll('input[name="days"]').forEach(cb => cb.checked = false);
-          document.getElementById('isClosed').checked = false; 
-        } else alert("เกิดข้อผิดพลาด: " + result.message);
-      } catch (error) { alert("ไม่สามารถเชื่อมต่อ API ได้"); }
-      
-            btn.innerHTML = subBtnHtml;
-      btn.disabled = false; btn.style.opacity = '1'; lucide.createIcons();
+          try { sessionStorage.setItem('rs_' + formData.semester, JSON.stringify(result.data)); } catch (e) {}
+          toast(currentLang === 'th' ? 'บันทึกเสร็จสิ้นค่ะ ✅' : 'Saved ✅');
+          if (result.notify) apiPost({ action: 'notifySaved', data: { row: result.row, semester: result.semester, isEdit: result.isEdit, closed: result.closed } }).catch(() => {});
+        } else {
+          drawUI(backup);
+          toast('บันทึกไม่สำเร็จ: ' + (result.message || ''), 'error');
+        }
+      }).catch(() => {
+        drawUI(backup);
+        toast('เชื่อมต่อไม่ได้ ย้อนข้อมูลกลับแล้ว กรุณาลองใหม่', 'error');
+      });
     };
 
     function editItem(rowIdx) {
@@ -573,23 +594,31 @@
     function openModal(rowIdx, id) { deleteTargetRow = rowIdx; deleteTargetId = id; document.getElementById('deleteModal').classList.remove('hidden'); }
     function closeModal() { document.getElementById('deleteModal').classList.add('hidden'); }
     
-    document.getElementById('confirmDeleteBtn').onclick = async function() {
-      const btn = this; 
-      btn.innerHTML = currentLang === 'th' ? "กำลังลบ..." : "Deleting..."; 
-      btn.disabled = true;
+        document.getElementById('confirmDeleteBtn').onclick = function() {
       const semester = getSemesterStr();
-      const isNotify = document.getElementById('notifyLine').checked; 
-      
-              try {
-        const result = await apiPost({ action: 'delete', rowIdx: deleteTargetRow, courseId: deleteTargetId, semester: semester, isNotify: isNotify });
-        
-                if(result.status === 'success') {
-          closeModal();
+      const isNotify = document.getElementById('notifyLine').checked;
+      const rowIdx = deleteTargetRow, courseId = deleteTargetId;
+
+      // ปิดป๊อปอัพ + เอาแถวออกจากหน้าจอทันที
+      closeModal();
+      const backup = JSON.parse(JSON.stringify(globalData));
+      const optimistic = JSON.parse(JSON.stringify(globalData));
+      if (optimistic[rowIdx - 1] && String(optimistic[rowIdx - 1][2]).toUpperCase() === String(courseId).toUpperCase()) optimistic.splice(rowIdx - 1, 1);
+      drawUI(optimistic);
+
+      apiPost({ action: 'delete', rowIdx: rowIdx, courseId: courseId, semester: semester, isNotify: isNotify }).then(result => {
+        if (result.status === 'success') {
           drawUI(result.data);
-          try { sessionStorage.setItem('rs_' + getSemesterStr(), JSON.stringify(result.data)); } catch (e) {}
+          try { sessionStorage.setItem('rs_' + semester, JSON.stringify(result.data)); } catch (e) {}
+          toast(currentLang === 'th' ? 'ลบเสร็จสิ้นค่ะ 🗑️' : 'Deleted 🗑️');
+        } else {
+          drawUI(backup);
+          toast('ลบไม่สำเร็จ', 'error');
         }
-      } catch (error) { alert("เกิดข้อผิดพลาดในการลบข้อมูล"); }
-      btn.innerText = currentLang === 'th' ? "ลบออก" : "Delete"; btn.disabled = false;
+      }).catch(() => {
+        drawUI(backup);
+        toast('เชื่อมต่อไม่ได้ ย้อนข้อมูลกลับแล้ว', 'error');
+      });
     };
 
     async function downloadImg() {
@@ -637,28 +666,50 @@
     
     function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
     
-    async function saveSettingsBtn() {
-      const btn = document.getElementById('saveSetBtn'); 
-      const origHtml = btn.innerHTML;
-      btn.innerText = currentLang === 'th' ? "กำลังบันทึก..." : "Saving..."; btn.disabled = true;
-      const config = {
-        startDate: document.getElementById('setStartDate').value,
-        classHour: document.getElementById('setClassHour').value,
-        examHour: document.getElementById('setExamHour').value,
-        notifySemester: document.getElementById('setNotifySemester').value,
-        examLeadMin: document.getElementById('setExamLead').value
-      };
-      
-      try {
-        const result = await apiPost({ action: 'saveSettings', data: config });
-        if(result.status === 'success') {
-          alert(currentLang === 'th' ? "บันทึกการตั้งค่าระบบแจ้งเตือนอัตโนมัติสำเร็จ!" : "Automation Settings Saved!");
-          closeSettings();
-        }
-      } catch (e) { alert("เกิดข้อผิดพลาดในการบันทึก"); }
-      
-      btn.innerHTML = origHtml; btn.disabled = false; lucide.createIcons();
+        function saveSettingsBtn() {
+  const config = {
+    startDate: document.getElementById('setStartDate').value,
+    classHour: document.getElementById('setClassHour').value,
+    examHour: document.getElementById('setExamHour').value,
+    notifySemester: document.getElementById('setNotifySemester').value,
+    examLeadMin: document.getElementById('setExamLead').value
+  };
+  const hols = parseHolidayBulk();
+  const holText = document.getElementById('holBulk').value;
+
+  // วาดวันหยุดใหม่ลงรายการทันที (optimistic) แล้วค่อยปิด modal
+  if (hols.length) {
+    const current = Array.from(document.querySelectorAll('#holList b')).map(b => [b.textContent, b.parentElement.textContent.replace(b.textContent, '').trim()]);
+    const merged = current.filter(c => !hols.some(h => h[0] === c[0])).concat(hols);
+    drawHolidays(merged);
+  }
+  document.getElementById('holBulk').value = '';
+  closeSettings();
+  toast(currentLang === 'th' ? 'กำลังบันทึกการตั้งค่า...' : 'Saving settings...', 'info');
+
+  const jobs = [apiPost({ action: 'saveSettings', data: config })];
+  if (hols.length) jobs.push(apiPost({ action: 'addHolidays', list: hols }));
+
+  Promise.all(jobs).then(results => {
+    // ตรวจว่าทุกงานตอบ success จริง
+    const failed = results.find(r => !r || r.status !== 'success');
+    if (failed) {
+      document.getElementById('holBulk').value = holText; // คืนข้อความที่พิมพ์ไว้
+      loadHolidays();                                      // ดึงรายการจริงจาก server
+      toast('บันทึกไม่สำเร็จ: ' + ((failed && failed.message) || 'เซิร์ฟเวอร์ตอบผิดพลาด'), 'error');
+      return;
     }
+    // อัปเดตรายการวันหยุดด้วยข้อมูลจริงจาก server
+    const holResult = results[1];
+    if (holResult) drawHolidays(holResult.data);
+    toast(currentLang === 'th' ? 'บันทึกการตั้งค่าเสร็จสิ้นค่ะ ✅' : 'Settings saved ✅');
+  }).catch(() => {
+    document.getElementById('holBulk').value = holText;
+    loadHolidays();
+    toast('เชื่อมต่อไม่ได้ บันทึกการตั้งค่าไม่สำเร็จ ลองใหม่อีกครั้ง', 'error');
+  });
+}
+    
         function drawHolidays(list) {
       const box = document.getElementById('holList');
       if (!list || !list.length) { box.innerHTML = '<p class="text-slate-400 text-xs">ยังไม่มีวันหยุด</p>'; return; }
@@ -671,14 +722,14 @@
     async function loadHolidays() {
       try { const r = await apiPost({ action: 'getHolidays' }); if (r.status === 'success') drawHolidays(r.data); } catch (e) {}
     }
-    async function addHolidayBtn() {
-      const date = document.getElementById('holDate').value.trim();
-      const name = document.getElementById('holName').value.trim();
-      if (!/^\d{2}\/\d{2}$/.test(date) || !name) { alert('กรอกวันที่แบบ dd/MM เช่น 15/08 และชื่อวันหยุด'); return; }
-      try {
-        const r = await apiPost({ action: 'addHoliday', date: date, name: name });
-        if (r.status === 'success') { drawHolidays(r.data); document.getElementById('holDate').value = ''; document.getElementById('holName').value = ''; }
-      } catch (e) { alert('ไม่สามารถเชื่อมต่อ API ได้'); }
+        function parseHolidayBulk() {
+      const lines = document.getElementById('holBulk').value.split('\n').map(s => s.trim()).filter(Boolean);
+      const out = [];
+      for (const line of lines) {
+        const m = line.match(/^(\d{1,2})\/(\d{1,2})\s+(.+)$/);
+        if (m) out.push([m[1].padStart(2, '0') + '/' + m[2].padStart(2, '0'), m[3]]);
+      }
+      return out;
     }
     async function delHolidayBtn(date) {
       if (!confirm('ลบวันหยุด ' + date + ' ?')) return;
