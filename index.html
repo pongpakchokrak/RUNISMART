@@ -485,6 +485,8 @@
       e.preventDefault();
       const btn = document.getElementById('subBtn');
       btn.disabled = true; btn.style.opacity = '0.5';
+      const subBtnHtml = btn.innerHTML;
+      btn.innerText = currentLang === 'th' ? "กำลังบันทึก..." : "Saving...";
       
       const formData = Object.fromEntries(new FormData(this).entries());
       const daysCheckboxes = document.querySelectorAll('input[name="days"]:checked');
@@ -514,6 +516,7 @@
         } else alert("เกิดข้อผิดพลาด: " + result.message);
       } catch (error) { alert("ไม่สามารถเชื่อมต่อ API ได้"); }
       
+            btn.innerHTML = subBtnHtml;
       btn.disabled = false; btn.style.opacity = '1'; lucide.createIcons();
     };
 
