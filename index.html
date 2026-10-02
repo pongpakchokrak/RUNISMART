@@ -97,6 +97,15 @@
            <p class="text-[10px] text-rose-500 mt-1" data-th="* ระบบจะยึดตามภาคเรียนที่คุณเลือกอยู่ปัจจุบัน" data-en="* Based on your currently selected term.">* ระบบจะยึดตามภาคเรียนที่คุณเลือกอยู่ปัจจุบัน</p>
         </div>
       </div>
+            <div class="mt-5 pt-4 border-t border-slate-100">
+        <p class="text-[11px] font-bold text-slate-500 uppercase mb-2">วันหยุด (งดแจ้งเตือนเรียน)</p>
+        <div class="grid grid-cols-5 gap-2">
+          <input type="text" id="holDate" maxlength="5" placeholder="dd/MM" class="input-pro col-span-2">
+          <input type="text" id="holName" placeholder="ชื่อวันหยุด" class="input-pro col-span-3">
+        </div>
+        <button type="button" onclick="addHolidayBtn()" class="w-full mt-2 py-2 bg-rose-50 text-rose-600 border border-rose-200 rounded-xl font-bold text-sm">+ เพิ่ม / แก้ไขวันหยุด</button>
+        <div id="holList" class="mt-3 max-h-40 overflow-y-auto space-y-1 text-sm"></div>
+      </div>
       <button onclick="saveSettingsBtn()" id="saveSetBtn" class="w-full py-3 mt-6 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold flex items-center justify-center gap-2">
         <i data-lucide="save" class="w-4 h-4"></i> <span data-th="บันทึกการตั้งค่า" data-en="Save Settings">บันทึกการตั้งค่า</span>
       </button>
@@ -280,6 +289,28 @@
     let deleteTargetRow = null;
     let deleteTargetId = null;
     let currentLang = 'th';
+        async function apiPost(body, tries = 3) {
+      for (let i = 0; i < tries; i++) {
+        try {
+          const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) });
+          return await res.json();
+        } catch (e) {
+          if (i === tries - 1) throw e;
+          await new Promise(r => setTimeout(r, 700 * (i + 1)));
+        }
+      }
+    }
+    async function apiGet(query, tries = 3) {
+      for (let i = 0; i < tries; i++) {
+        try {
+          const res = await fetch(API_URL + '?' + query);
+          return await res.json();
+        } catch (e) {
+          if (i === tries - 1) throw e;
+          await new Promise(r => setTimeout(r, 700 * (i + 1)));
+        }
+      }
+    }
         function buildYearOptions() {
       const sel = document.getElementById('yearSelect');
       const currentBE = new Date().getFullYear() + 543;
@@ -324,8 +355,7 @@
   }
 
   try {
-    const response = await fetch(`${API_URL}?action=getData&semester=${encodeURIComponent(sem)}`);
-    const data = await response.json();
+    const data = await apiGet(`action=getData&semester=${encodeURIComponent(sem)}`);
     try { sessionStorage.setItem(cacheKey, JSON.stringify(data)); } catch (e) {}
     drawUI(data);
   } catch (error) {
@@ -498,16 +528,11 @@
       // ดึง Semester กลับไปเป็นภาษาไทยเสมอเพื่อหา Sheet ให้เจอ
       formData.semester = document.getElementById('termSelect').options[document.getElementById('termSelect').selectedIndex].getAttribute('data-th') + " " + document.getElementById('yearSelect').value;
 
-      try {
-        const response = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action: 'save', data: formData })
-        });
-        const result = await response.json();
+            try {
+        const result = await apiPost({ action: 'save', data: formData });
         
         if(result.status === 'success') {
-          drawUI(result.data); 
+          drawUI(result.data);
           try { sessionStorage.setItem('rs_' + getSemesterStr(), JSON.stringify(result.data)); } catch (e) {}
           document.getElementById('targetRow').value = "0";
           document.getElementById('courseId').value = ""; document.getElementById('courseName').value = "";
@@ -548,13 +573,8 @@
       const semester = getSemesterStr();
       const isNotify = document.getElementById('notifyLine').checked; 
       
-      try {
-        const response = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action: 'delete', rowIdx: deleteTargetRow, courseId: deleteTargetId, semester: semester, isNotify: isNotify })
-        });
-        const result = await response.json();
+              try {
+        const result = await apiPost({ action: 'delete', rowIdx: deleteTargetRow, courseId: deleteTargetId, semester: semester, isNotify: isNotify });
         
                 if(result.status === 'success') {
           closeModal();
@@ -594,14 +614,10 @@
     async function openSettings() {
       document.getElementById('setNotifySemester').value = getSemesterStr();
       document.getElementById('settingsModal').classList.remove('hidden');
+      loadHolidays();
       
-      try {
-        const response = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action: 'getSettings' })
-        });
-        const result = await response.json();
+            try {
+        const result = await apiPost({ action: 'getSettings' });
         if(result.status === 'success' && result.data) {
            const props = result.data;
            if(props.START_DATE) document.getElementById('setStartDate').value = props.START_DATE;
@@ -627,12 +643,7 @@
       };
       
       try {
-        const response = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action: 'saveSettings', data: config })
-        });
-        const result = await response.json();
+        const result = await apiPost({ action: 'saveSettings', data: config });
         if(result.status === 'success') {
           alert(currentLang === 'th' ? "บันทึกการตั้งค่าระบบแจ้งเตือนอัตโนมัติสำเร็จ!" : "Automation Settings Saved!");
           closeSettings();
@@ -640,6 +651,34 @@
       } catch (e) { alert("เกิดข้อผิดพลาดในการบันทึก"); }
       
       btn.innerHTML = origHtml; btn.disabled = false; lucide.createIcons();
+    }
+        function drawHolidays(list) {
+      const box = document.getElementById('holList');
+      if (!list || !list.length) { box.innerHTML = '<p class="text-slate-400 text-xs">ยังไม่มีวันหยุด</p>'; return; }
+      box.innerHTML = list.map(h => `
+        <div class="flex justify-between items-center bg-slate-50 rounded-lg px-3 py-1">
+          <span><b>${h[0]}</b> ${h[1]}</span>
+          <button type="button" onclick="delHolidayBtn('${h[0]}')" class="text-rose-500 font-bold px-2">ลบ</button>
+        </div>`).join('');
+    }
+    async function loadHolidays() {
+      try { const r = await apiPost({ action: 'getHolidays' }); if (r.status === 'success') drawHolidays(r.data); } catch (e) {}
+    }
+    async function addHolidayBtn() {
+      const date = document.getElementById('holDate').value.trim();
+      const name = document.getElementById('holName').value.trim();
+      if (!/^\d{2}\/\d{2}$/.test(date) || !name) { alert('กรอกวันที่แบบ dd/MM เช่น 15/08 และชื่อวันหยุด'); return; }
+      try {
+        const r = await apiPost({ action: 'addHoliday', date: date, name: name });
+        if (r.status === 'success') { drawHolidays(r.data); document.getElementById('holDate').value = ''; document.getElementById('holName').value = ''; }
+      } catch (e) { alert('ไม่สามารถเชื่อมต่อ API ได้'); }
+    }
+    async function delHolidayBtn(date) {
+      if (!confirm('ลบวันหยุด ' + date + ' ?')) return;
+      try {
+        const r = await apiPost({ action: 'deleteHoliday', date: date });
+        if (r.status === 'success') drawHolidays(r.data);
+      } catch (e) { alert('ไม่สามารถเชื่อมต่อ API ได้'); }
     }
   </script>
 </body>
