@@ -742,12 +742,13 @@
   }
   return out;
 }
-    async function delHolidayBtn(date) {
-      if (!confirm('ลบวันหยุด ' + date + ' ?')) return;
-      try {
-        const r = await apiPost({ action: 'deleteHoliday', date: date });
-        if (r.status === 'success') drawHolidays(r.data);
-      } catch (e) { alert('ไม่สามารถเชื่อมต่อ API ได้'); }
+        function delHolidayBtn(date) {
+      const backup = window._holCache || [];
+      drawHolidays(backup.filter(h => h[0] !== date));
+      apiPost({ action: 'deleteHoliday', date: date }).then(r => {
+        if (r.status === 'success') { drawHolidays(r.data); toast('ลบวันหยุดเสร็จสิ้นค่ะ 🗑️'); }
+        else { drawHolidays(backup); toast('ลบไม่สำเร็จ', 'error'); }
+      }).catch(() => { drawHolidays(backup); toast('เชื่อมต่อไม่ได้', 'error'); });
     }
   </script>
 </body>
