@@ -99,9 +99,10 @@
         </div>
       </div>
             <div class="mt-5 pt-4 border-t border-slate-100">
-        <p class="text-[11px] font-bold text-slate-500 uppercase mb-1">วันหยุด (งดแจ้งเตือนเรียน)</p>
-        <p class="text-[10px] text-slate-400 mb-2">พิมพ์ได้หลายบรรทัด รูปแบบ <b>dd/MM ชื่อวันหยุด</b> เช่น 15/08 วันสถาปนารามคำแหง</p>
-        <textarea id="holBulk" rows="3" placeholder="15/08 วันสถาปนารามคำแหง&#10;20/09 วันหยุดพิเศษ" class="input-pro"></textarea>
+        <p class="text-[11px] font-bold text-slate-500 uppercase mb-1">วันหยุด / วันสำคัญ</p>
+        <p class="text-[10px] text-slate-400 mb-2">พิมพ์ได้หลายบรรทัด<br> 🏖️ วันหยุด: <b>dd/MM ชื่อ</b> เช่น 15/08 วันสถาปนารามคำแหง<br>📌 วันสำคัญ: <b>! dd/MM ชื่อ</b> เช่น ! 20/09 วันลงทะเบียน<br>เตือนล่วงหน้า: <b>! dd/MM+3 ชื่อ</b> (เตือนก่อน 3 วัน)
+</p>
+        <textarea id="holBulk" rows="3" placeholder="15/08 วันสถาปนารามคำแหง&#10;! 20/09+3 วันลงทะเบียน" class="input-pro"></textarea>
         <div id="holList" class="mt-3 max-h-40 overflow-y-auto space-y-1 text-sm"></div>
       </div>
       </div>
@@ -679,7 +680,7 @@
 
   // วาดวันหยุดใหม่ลงรายการทันที (optimistic) แล้วค่อยปิด modal
   if (hols.length) {
-    const current = Array.from(document.querySelectorAll('#holList b')).map(b => [b.textContent, b.parentElement.textContent.replace(b.textContent, '').trim()]);
+    const current = window._holCache || [];
     const merged = current.filter(c => !hols.some(h => h[0] === c[0])).concat(hols);
     drawHolidays(merged);
   }
@@ -711,26 +712,36 @@
 }
     
         function drawHolidays(list) {
-      const box = document.getElementById('holList');
-      if (!list || !list.length) { box.innerHTML = '<p class="text-slate-400 text-xs">ยังไม่มีวันหยุด</p>'; return; }
-      box.innerHTML = list.map(h => `
-        <div class="flex justify-between items-center bg-slate-50 rounded-lg px-3 py-1">
-          <span><b>${h[0]}</b> ${h[1]}</span>
-          <button type="button" onclick="delHolidayBtn('${h[0]}')" class="text-rose-500 font-bold px-2">ลบ</button>
-        </div>`).join('');
-    }
+          window._holCache = list || []; 
+  const box = document.getElementById('holList');
+  if (!list || !list.length) { box.innerHTML = '<p class="text-slate-400 text-xs">ยังไม่มีวันหยุด/วันสำคัญ</p>'; return; }
+  box.innerHTML = list.map(h => {
+    const isNote = h[2] === 'สำคัญ';
+    const icon = isNote ? '📌' : '🏖️';
+    const lead = (isNote && Number(h[3]) > 0) ? ` <span class="text-[10px] text-amber-600">(เตือนก่อน ${h[3]} วัน)</span>` : '';
+    return `
+    <div class="flex justify-between items-center bg-slate-50 rounded-lg px-3 py-1">
+      <span>${icon} <b>${h[0]}</b> ${h[1]}${lead}</span>
+      <button type="button" onclick="delHolidayBtn('${h[0]}')" class="text-rose-500 font-bold px-2">ลบ</button>
+    </div>`;
+  }).join('');
+}
     async function loadHolidays() {
       try { const r = await apiPost({ action: 'getHolidays' }); if (r.status === 'success') drawHolidays(r.data); } catch (e) {}
     }
         function parseHolidayBulk() {
-      const lines = document.getElementById('holBulk').value.split('\n').map(s => s.trim()).filter(Boolean);
-      const out = [];
-      for (const line of lines) {
-        const m = line.match(/^(\d{1,2})\/(\d{1,2})\s+(.+)$/);
-        if (m) out.push([m[1].padStart(2, '0') + '/' + m[2].padStart(2, '0'), m[3]]);
-      }
-      return out;
-    }
+  const lines = document.getElementById('holBulk').value.split('\n').map(s => s.trim()).filter(Boolean);
+  const out = [];
+  for (const line of lines) {
+    const m = line.match(/^(!)?\s*(\d{1,2})\/(\d{1,2})(?:\+(\d{1,2}))?\s+(.+)$/);
+    if (!m) continue;
+    const type = m[1] ? 'สำคัญ' : 'หยุด';
+    const date = m[2].padStart(2, '0') + '/' + m[3].padStart(2, '0');
+    const lead = m[4] || '0';
+    out.push([date, m[5], type, lead]);
+  }
+  return out;
+}
     async function delHolidayBtn(date) {
       if (!confirm('ลบวันหยุด ' + date + ' ?')) return;
       try {
