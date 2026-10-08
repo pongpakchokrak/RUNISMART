@@ -38,9 +38,50 @@
     .day-selector span { display: block; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px; font-weight: 500; background: #f8fafc; transition: 0.2s; cursor: pointer; }
     .visual-grid-container { min-width: 900px; }
     .modal-overlay { background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(4px); }
+    /* ===== Login ===== */
+#loginScreen{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;padding:16px;
+  background:rgba(241,245,249,.75);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
+#loginScreen.hidden{display:none;}
+.login-card{background:#fff;width:100%;max-width:420px;border-radius:32px;padding:40px 28px;
+  box-shadow:0 25px 50px -12px rgba(0,0,0,.18);text-align:center;}
+.login-card img.logo{width:96px;height:96px;object-fit:contain;margin:0 auto 16px;}
+.login-field{position:relative;margin-top:6px;}
+.login-field .ic{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:20px;height:20px;color:#94a3b8;}
+.login-field input{width:100%;padding:14px 46px;border:1.5px solid #e2e8f0;border-radius:14px;font-size:16px;text-align:center;font-family:inherit;}
+.login-field input:focus{outline:none;border-color:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.12);}
+.login-field .eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);padding:6px;color:#94a3b8;cursor:pointer;background:none;border:none;}
+.login-btn{width:100%;margin-top:22px;padding:15px;background:#ef4444;color:#fff;border-radius:14px;font-weight:700;font-size:17px;
+  display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;border:none;transition:.2s;}
+.login-btn:hover{background:#dc2626;}
+.shake{animation:shake .4s;}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
   </style>
 </head>
 <body>
+  <div id="loginScreen" class="hidden">
+  <form id="loginForm" class="login-card" autocomplete="on">
+    <img class="logo" src="https://i.postimg.cc/d1qYjZYS/d-sin-th-y-ngmi-di-t-ngch-x.png" alt="logo">
+    <h2 class="text-2xl font-bold text-slate-800">RUniSmart</h2>
+    <p class="text-sm text-slate-500 mt-1 mb-6">กรุณาเข้าสู่ระบบเพื่อใช้งาน</p>
+
+    <label class="block text-left text-sm font-bold text-slate-700">ผู้ใช้ (Username)</label>
+    <div class="login-field">
+      <i data-lucide="user" class="ic"></i>
+      <input type="text" id="loginUser" placeholder="ใส่ชื่อผู้ใช้" autocomplete="username" required>
+    </div>
+
+    <label class="block text-left text-sm font-bold text-slate-700 mt-4">รหัสผ่าน (Password)</label>
+    <div class="login-field">
+      <i data-lucide="lock" class="ic"></i>
+      <input type="password" id="loginPass" placeholder="ใส่รหัสผ่าน" autocomplete="current-password" required>
+      <button type="button" class="eye" id="eyeBtn" aria-label="แสดง/ซ่อนรหัสผ่าน"><i data-lucide="eye-off" class="w-5 h-5"></i></button>
+    </div>
+
+    <p id="loginErr" class="text-red-500 text-sm mt-3 hidden">ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง</p>
+
+    <button type="submit" class="login-btn"><i data-lucide="log-in" class="w-5 h-5"></i> เข้าสู่ระบบ</button>
+  </form>
+</div>
     <div id="toastBox" class="fixed top-4 right-4 z-[200] space-y-2 pointer-events-none"></div>
   <!-- Modal ลบ -->
   <div id="deleteModal" class="fixed inset-0 z-[100] flex items-center justify-center hidden modal-overlay">
@@ -123,6 +164,7 @@
         </div>
         <div class="flex gap-2">
           <button onclick="openSettings()" class="p-2 bg-slate-100 rounded-lg text-slate-600 hover:bg-slate-200"><i data-lucide="settings" class="w-4 h-4"></i></button>
+          <button onclick="logout()" class="p-2 bg-slate-100 rounded-lg text-slate-600 hover:bg-slate-200" title="ออกจากระบบ"><i data-lucide="log-out" class="w-4 h-4"></i></button>
           <button onclick="toggleLang()" id="langBtn" class="text-xs font-bold bg-slate-100 px-3 py-1 rounded-md text-slate-600">EN</button>
         </div>
       </div>
@@ -284,6 +326,59 @@
   </div>
 
   <script>
+    // ===== Login Gate (เช็คกับ Apps Script) =====
+const LOGIN_KEY = "runismart_auth";
+
+function getAuth(){ try{ return JSON.parse(localStorage.getItem(LOGIN_KEY) || 'null'); }catch(e){ return null; } }
+function isLoggedIn(){ return !!getAuth(); }
+function logout(){ try{ localStorage.removeItem(LOGIN_KEY); }catch(e){} location.reload(); }
+
+function initLogin(){
+  const screen = document.getElementById('loginScreen');
+  if (isLoggedIn()) { screen.classList.add('hidden'); return; }
+  screen.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  lucide.createIcons();
+
+  const pass = document.getElementById('loginPass');
+  document.getElementById('eyeBtn').onclick = () => {
+    const show = pass.type === 'password';
+    pass.type = show ? 'text' : 'password';
+    document.getElementById('eyeBtn').innerHTML = `<i data-lucide="${show?'eye':'eye-off'}" class="w-5 h-5"></i>`;
+    lucide.createIcons();
+  };
+
+  document.getElementById('loginForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const u = document.getElementById('loginUser').value.trim();
+    const p = pass.value;
+    const err = document.getElementById('loginErr');
+    err.classList.add('hidden');
+
+    let ok = false;
+    try {
+      const r = await apiPost({ action: 'login', u: u, p: p }, 1);
+      ok = r && r.status === 'success';
+    } catch (e2) {
+      err.textContent = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้ง';
+      err.classList.remove('hidden');
+      return;
+    }
+
+    if (ok) {
+      try{ localStorage.setItem(LOGIN_KEY, JSON.stringify({ u: u, p: p })); }catch(e3){}
+      screen.classList.add('hidden');
+      document.body.style.overflow = '';
+      loadData();
+    } else {
+      err.textContent = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+      err.classList.remove('hidden');
+      const card = document.querySelector('.login-card');
+      card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
+      pass.value = '';
+    }
+  };
+}
     const API_URL = "https://script.google.com/macros/s/AKfycbxMV85UHUtS1pTk5JrmB9Plgk7KheHD1Nre5xSg-MwRCLxQE9UAfQwQrQC_iO66QcplTA/exec";
 
     lucide.createIcons();
@@ -302,27 +397,34 @@
       setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 2800);
     }
         async function apiPost(body, tries = 3) {
-      for (let i = 0; i < tries; i++) {
-        try {
-          const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) });
-          return await res.json();
-        } catch (e) {
-          if (i === tries - 1) throw e;
-          await new Promise(r => setTimeout(r, 700 * (i + 1)));
-        }
-      }
+  body = Object.assign({}, getAuth() || {}, body);
+  for (let i = 0; i < tries; i++) {
+    try {
+      const res = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) });
+      const json = await res.json();
+      if (json && json.status === 'unauthorized' && body.action !== 'login') { logout(); }
+      return json;
+    } catch (e) {
+      if (i === tries - 1) throw e;
+      await new Promise(r => setTimeout(r, 700 * (i + 1)));
     }
-    async function apiGet(query, tries = 3) {
-      for (let i = 0; i < tries; i++) {
-        try {
-          const res = await fetch(API_URL + '?' + query);
-          return await res.json();
-        } catch (e) {
-          if (i === tries - 1) throw e;
-          await new Promise(r => setTimeout(r, 700 * (i + 1)));
-        }
-      }
+  }
+}
+async function apiGet(query, tries = 3) {
+  const a = getAuth() || {};
+  const q = query + '&u=' + encodeURIComponent(a.u || '') + '&p=' + encodeURIComponent(a.p || '');
+  for (let i = 0; i < tries; i++) {
+    try {
+      const res = await fetch(API_URL + '?' + q);
+      const json = await res.json();
+      if (json && json.status === 'unauthorized') { logout(); }
+      return json;
+    } catch (e) {
+      if (i === tries - 1) throw e;
+      await new Promise(r => setTimeout(r, 700 * (i + 1)));
     }
+  }
+}
         function buildYearOptions() {
       const sel = document.getElementById('yearSelect');
       const currentBE = new Date().getFullYear() + 543;
@@ -375,12 +477,13 @@
   }
 }
 
-    window.onload = () => { 
-      setInterval(runClock, 1000); 
-      runClock(); 
-      applyLanguage();
-      loadData(); 
-    };
+    window.onload = () => {
+  setInterval(runClock, 1000);
+  runClock();
+  applyLanguage();
+  initLogin();
+  if (isLoggedIn()) loadData();   // โหลดข้อมูลเฉพาะตอนล็อกอินแล้ว
+};
 
     function toggleLang() {
       currentLang = currentLang === 'th' ? 'en' : 'th';
