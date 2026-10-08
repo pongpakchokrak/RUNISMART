@@ -54,6 +54,9 @@
   display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;border:none;transition:.2s;}
 .login-btn:hover{background:#dc2626;}
 .shake{animation:shake .4s;}
+.login-btn:disabled{opacity:.75;cursor:not-allowed;}
+.spinner{width:20px;height:20px;border:3px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
 @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
   </style>
 </head>
@@ -79,7 +82,7 @@
 
     <p id="loginErr" class="text-red-500 text-sm mt-3 hidden">ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง</p>
 
-    <button type="submit" class="login-btn"><i data-lucide="log-in" class="w-5 h-5"></i> เข้าสู่ระบบ</button>
+    <button type="submit" id="loginBtn" class="login-btn"><i data-lucide="log-in" class="w-5 h-5"></i> <span>เข้าสู่ระบบ</span></button>
   </form>
 </div>
     <div id="toastBox" class="fixed top-4 right-4 z-[200] space-y-2 pointer-events-none"></div>
@@ -348,18 +351,32 @@ function initLogin(){
     lucide.createIcons();
   };
 
-  document.getElementById('loginForm').onsubmit = async (e) => {
+    document.getElementById('loginForm').onsubmit = async (e) => {
     e.preventDefault();
+    const btn = document.getElementById('loginBtn');
+    if (btn.disabled) return;
+    const oldHtml = btn.innerHTML;
+    const setLoading = (on) => {
+      btn.disabled = on;
+      btn.innerHTML = on
+        ? '<span class="spinner"></span> <span>กำลังเข้าสู่ระบบ...</span>'
+        : oldHtml;
+      if (!on) lucide.createIcons();
+    };
+
     const u = document.getElementById('loginUser').value.trim();
     const p = pass.value;
     const err = document.getElementById('loginErr');
     err.classList.add('hidden');
+
+    setLoading(true);
 
     let ok = false;
     try {
       const r = await apiPost({ action: 'login', u: u, p: p }, 1);
       ok = r && r.status === 'success';
     } catch (e2) {
+      setLoading(false);
       err.textContent = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้ง';
       err.classList.remove('hidden');
       return;
@@ -369,8 +386,10 @@ function initLogin(){
       try{ localStorage.setItem(LOGIN_KEY, JSON.stringify({ u: u, p: p })); }catch(e3){}
       screen.classList.add('hidden');
       document.body.style.overflow = '';
+      setLoading(false);
       loadData();
     } else {
+      setLoading(false);
       err.textContent = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
       err.classList.remove('hidden');
       const card = document.querySelector('.login-card');
