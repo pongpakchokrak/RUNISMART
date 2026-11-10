@@ -83,6 +83,28 @@
     <p id="loginErr" class="text-red-500 text-sm mt-3 hidden">ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง</p>
 
     <button type="submit" id="loginBtn" class="login-btn"><i data-lucide="log-in" class="w-5 h-5"></i> <span>เข้าสู่ระบบ</span></button>
+    <p class="text-sm text-slate-500 mt-4">ยังไม่มีบัญชี? <button type="button" id="toRegister" class="text-rose-500 font-bold underline">สมัครสมาชิก</button></p>
+  </form>
+      <form id="registerForm" class="login-card hidden" autocomplete="off">
+    <h2 class="text-2xl font-bold text-slate-800">สมัครสมาชิก</h2>
+    <p class="text-sm text-slate-500 mt-1 mb-6">ต้องมีรหัสลงทะเบียนจากผู้ดูแล</p>
+
+    <label class="block text-left text-sm font-bold text-slate-700">ชื่อผู้ใช้</label>
+    <div class="login-field"><i data-lucide="user" class="ic"></i>
+      <input type="text" id="regUser" placeholder="ตั้งชื่อผู้ใช้ (ห้ามมี __)" required></div>
+
+    <label class="block text-left text-sm font-bold text-slate-700 mt-4">รหัสผ่าน (อย่างน้อย 6 ตัว)</label>
+    <div class="login-field"><i data-lucide="lock" class="ic"></i>
+      <input type="password" id="regPass" placeholder="ตั้งรหัสผ่าน" required minlength="6"></div>
+
+    <label class="block text-left text-sm font-bold text-slate-700 mt-4">รหัสลงทะเบียน</label>
+    <div class="login-field"><i data-lucide="key" class="ic"></i>
+      <input type="password" id="regCode" placeholder="ใส่รหัสลงทะเบียน" required></div>
+
+    <p id="regErr" class="text-red-500 text-sm mt-3 hidden"></p>
+
+    <button type="submit" id="regBtn" class="login-btn"><span>สมัครสมาชิก</span></button>
+    <p class="text-sm text-slate-500 mt-4">มีบัญชีแล้ว? <button type="button" id="toLogin" class="text-rose-500 font-bold underline">เข้าสู่ระบบ</button></p>
   </form>
 </div>
     <div id="toastBox" class="fixed top-4 right-4 z-[200] space-y-2 pointer-events-none"></div>
@@ -335,8 +357,42 @@
 
     </main>
   </div>
-
   <script>
+      function showRegister(on) {
+      document.getElementById('loginForm').classList.toggle('hidden', on);
+      document.getElementById('registerForm').classList.toggle('hidden', !on);
+    }
+    document.getElementById('toRegister').onclick = () => showRegister(true);
+    document.getElementById('toLogin').onclick = () => showRegister(false);
+
+    document.getElementById('registerForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('regBtn');
+      const err = document.getElementById('regErr');
+      err.classList.add('hidden');
+      btn.disabled = true;
+      try {
+        const r = await apiPost({
+          action: 'register',
+          username: document.getElementById('regUser').value.trim(),
+          password: document.getElementById('regPass').value,
+          inviteCode: document.getElementById('regCode').value
+        }, 1);
+        if (r && r.status === 'success') {
+          toast('สมัครสมาชิกสำเร็จ ล็อกอินได้เลยค่ะ');
+          e.target.reset();
+          showRegister(false);
+        } else {
+          err.textContent = (r && r.message) || 'สมัครไม่สำเร็จ';
+          err.classList.remove('hidden');
+        }
+      } catch (ex) {
+        err.textContent = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้';
+        err.classList.remove('hidden');
+      }
+      btn.disabled = false;
+    };
+    
     // ===== Login Gate (เช็คกับ Apps Script) =====
 const LOGIN_KEY = "runismart_auth";
 
