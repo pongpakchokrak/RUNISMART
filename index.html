@@ -612,6 +612,22 @@ async function apiGet(query, tries = 3) {
       return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
     }
 
+    const WEEK_DAYS = ['วันจันทร์','วันอังคาร','วันพุธ','วันพฤหัสบดี','วันศุกร์','วันเสาร์','วันอาทิตย์'];
+
+function weekRank(dayStr) {
+  const ranks = String(dayStr || '').split(',').map(s => WEEK_DAYS.indexOf(s.trim())).filter(i => i !== -1);
+  return ranks.length ? Math.min(...ranks) : 99;
+}
+function timeMin(s) {
+  const m = String(s || '').match(/(\d{1,2}):(\d{2})/);
+  return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : 9999;
+}
+// คืนค่า {r, i} โดย i คือ index เดิมในชีต (ใช้กับปุ่มแก้ไข/ลบ)
+function sortRowsWithIndex(data) {
+  return data.slice(1).map((r, i) => ({ r, i }))
+    .sort((a, b) => (weekRank(a.r[0]) - weekRank(b.r[0])) || (timeMin(a.r[1]) - timeMin(b.r[1])));
+}
+
     function drawUI(data) {
   if(!data || !Array.isArray(data)) return;
   globalData = data;
@@ -634,7 +650,7 @@ async function apiGet(query, tries = 3) {
          body.innerHTML = `<tr><td colspan="7" class="p-10 text-center text-slate-400">${currentLang === 'th' ? 'ยังไม่มีข้อมูลในภาคเรียนนี้' : 'No data in this semester.'}</td></tr>`; return;
       }
 
-      body.innerHTML = data.slice(1).map((r, i) => {
+      body.innerHTML = sortRowsWithIndex(data).map(({ r, i }) => {
         const isClosed = r[10] === "ปิดคลาส";
         const rowStyle = isClosed ? "opacity-60 bg-slate-100" : "hover:bg-slate-50";
         const badgeTxt = currentLang === 'th' ? 'ปิดคลาสแล้ว' : 'Closed';
@@ -698,7 +714,7 @@ async function apiGet(query, tries = 3) {
       ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].forEach(id => document.getElementById(id).innerHTML = '');
       
       if(data.length <= 1) return;
-      data.slice(1).forEach(r => {
+      sortRowsWithIndex(data).forEach(({ r }) => {
         const rowDays = r[0].split(', ');
         const theme = r[8] || 'bg-rose-50 border-rose-200 text-rose-800'; 
         const isClosed = r[10] === "ปิดคลาส";
