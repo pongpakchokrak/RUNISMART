@@ -891,7 +891,7 @@ async function apiGet(query, tries = 3) {
         else { drawHolidays(backup); toast('ลบไม่สำเร็จ', 'error'); }
       }).catch(() => { drawHolidays(backup); toast('เชื่อมต่อไม่ได้', 'error'); });
     }
-    sync function loadLineStatus() {
+  async function loadLineStatus() {
       try {
         const r = await apiPost({ action: 'getLinkStatus' });
         document.getElementById('lineStatus').textContent = r.linked
